@@ -14,7 +14,7 @@ namespace CivilianManagment
         public string name;
         public int versionMajor;
         public int versionMinor;
-
+        
         public extern KSPAssemblyDependency(string name, int versionMajor, int versionMinor);
     }
 
@@ -30,14 +30,14 @@ namespace CivilianManagment
         public float scientistBonus = .10f;
 
         [KSPField(isPersistant = false, guiActive = false)]
-        public float loveMovieBonus = .50f;
+        public float RomanceMovieBonus = .05f;
 
         [KSPField(isPersistant = false, guiActive = false)]
         public string InspirationResourceName = "inspiration";
 
         [KSPField(isPersistant = true, guiActive = true, guiName = "Movie Type Playing")]
         public string MovieType = "none";
-        [KSPField(isPersistant = true, guiActive = true, guiName = "Movie Type Playing")]
+        [KSPField(isPersistant = true, guiActive = true, guiName = "Bonus")]
         public string MovieBonus = "none";
 
         void resetPartInspiration()
@@ -226,7 +226,7 @@ namespace CivilianManagment
         {
             resetPartInspiration();
             MovieType = "Racing Movies";
-            MovieBonus = "10% reduced Engineer recruitment cost";
+            MovieBonus = "-10% Engineer recruitment cost";
             StartResourceConverter();
             Events["StartResourceConverter"].active = false;
             Events["StopResourceConverter"].active = false;
@@ -237,7 +237,7 @@ namespace CivilianManagment
         {
             resetPartInspiration();
             MovieType = "Scifi Movies";
-            MovieBonus = "10% reduced Pilot recruitment cost";
+            MovieBonus = "-10% Pilot recruitment cost";
             StartResourceConverter();
             Events["StartResourceConverter"].active = false;
             Events["StopResourceConverter"].active = false;
@@ -248,12 +248,24 @@ namespace CivilianManagment
         {
             resetPartInspiration();
             MovieType = "Documentaries";
-            MovieBonus = "10% reduced Scientist recruitment cost";
+            MovieBonus = "-10% Scientist recruitment cost";
             StartResourceConverter();
             Events["StartResourceConverter"].active = false;
             Events["StopResourceConverter"].active = false;
 
         }
+       [KSPEvent(guiName = "Play Romance Movies", active = true, guiActive = true)]
+        public void playRomance()
+        {
+            resetPartInspiration();
+            MovieType = "Romance";
+            MovieBonus = "10% Bonus to Civilian Reproduction";
+            StartResourceConverter();
+            Events["StartResourceConverter"].active = false;
+            Events["StopResourceConverter"].active = false;
+        }
+       
+        
         [KSPEvent(guiName = "Close Movie Theater", active = true, guiActive = true)]
         public void closeTheater()
         {
@@ -288,10 +300,10 @@ namespace CivilianManagment
         [KSPField(isPersistant = false, guiActive = false)]
         public string civilianWastes;
 
-        [KSPField(isPersistant = false, guiActive = true)]
+        [KSPField(isPersistant = false, guiActive = false)]
         public float kerbalMass = 105.0f;
 
-        [KSPField(isPersistant = false, guiActive = true)]
+        [KSPField(isPersistant = false, guiActive = false)]
         public float foodPerPop;  //this is how much food is needed for the population to grow, and how much is generated when the population shrinks
         //this is calculated now, based on kerbal mass.
         //new civie pop can be recruited at this rate of food per population.  open resource system has a food definition.  That wil lbe fine
@@ -314,7 +326,7 @@ namespace CivilianManagment
 
         [KSPField(isPersistant = false, guiActive = true)]
         public float populationGrowthRate;  //how fast does the civie population go to ship when there's food?
-        [KSPField(isPersistant = false, guiActive = true)]
+        [KSPField(isPersistant = false, guiActive = false)]
         public float reproductionRate;
 
         [KSPField(isPersistant = true, guiActive = true)]
@@ -327,13 +339,13 @@ namespace CivilianManagment
         [KSPField(isPersistant = true, guiActive = true)]
         public float populationDecayTimer;  //how fast does the civie population jump ship when there's no food?
 
-        [KSPField(isPersistant = true, guiActive = true)]
+        [KSPField(isPersistant = true, guiActive = false)]
         public float CostToReproduce;  //show the player how much food their population is consuming
 
         [KSPField(isPersistant = true, guiActive = true)]
         public bool civilianDock;
 
-        [KSPField(isPersistant = true, guiActive = true)]
+        [KSPField(isPersistant = true, guiActive = false)]
         public float civilianDockGrowthRate;
 
         [KSPField(isPersistant = true, guiActive = false)]
@@ -388,7 +400,7 @@ namespace CivilianManagment
                 case "Mun":
                     return civilianDockGrowthRate / 10;
                 case "Minmus":
-                    return civilianDockGrowthRate / 100;
+                    return civilianDockGrowthRate / 50;
                 default:
                     return 0;
             }
@@ -464,7 +476,7 @@ namespace CivilianManagment
         {
             var theaters = vessel.FindPartModulesImplementing<MovieTheater>();
             foreach (MovieTheater t in theaters)
-                if (t.MovieType == "Love Movies")
+                if (t.MovieType == "Romance")
                     return true;
             return false;
         }
@@ -658,17 +670,25 @@ namespace CivilianManagment
             //mass / density = unit
             double foodRequired = kerbalMass / 0.28102905982906; //lol density of food in kg
             double currentPop = base.ResBroker.AmountAvailable(this.part, populationResourceName, dt, "ALL_VESSEL");//getResourceBudget(populationResourceName);
-
+            var inKerbinSOI = (part.vessel.mainBody.name == "Kerbin");
+            var inMinmusSoi = (part.vessel.mainBody.name == "Minmus");
+            var inMunSoi = (part.vessel.mainBody.name == "Mun");
             growthRate = (float)(currentPop / reproductionRate);
             if (getTheaterBonus())
-                growthRate += growthRate * .5f;
+                growthRate += growthRate * .10f;
+            
             if (growthRate < 1)  //can't grow population unless it's big enough
+            { 
                 growthRate = 0;
+                }
             // print("2");
-            if (civilianDock)
+            if (inKerbinSOI || inMinmusSoi || inMunSoi)
             {
-                foodRequired = 0; //new kerbals arriving don't need to spend food to grow
-                growthRate = getRecruitmentRate(); //kerbal recruitment much faster than reproduction
+                if (civilianDock)
+                {
+                    foodRequired = 0; //new kerbals arriving don't need to spend food to grow
+                    growthRate = getRecruitmentRate(); //kerbal recruitment much faster than reproduction
+                }
             }
             // print("3");
             bool needsMet = true;
@@ -680,11 +700,7 @@ namespace CivilianManagment
             // Debug.Log(base.status + " " + dt.ToString() + base.RecipeInputs);
             double decayMultiplier = 1;
             needsMet = !base.status.Contains("missing");
-            //print("3a");
-            //no air
-            // needsMet = needsMet && (co2 != co2Cap);
-            //if (co2 == co2Cap)
-            //   decayMultiplier = 10; //decay faster with no air
+
 
             if (needsMet)
             {
@@ -699,15 +715,13 @@ namespace CivilianManagment
                 {
                     if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER)
                     {
-                        if (vessel.situation != Vessel.Situations.LANDED && vessel.mainBody.bodyName == "Kerbin")
-                            
-                        {
-                            //CurrencyModifierQuery q = CurrencyModifierQuery.RunQuery(TransactionReasons.ContractReward, taxesAcquired, 0, 0);
-                            // q.AddDelta(Currency.Funds, taxesAcquired);
-                            Funding.Instance.AddFunds(taxes, TransactionReasons.Vessels);
-                            TimeUntilTaxes = 21600;
-                        }
+
+
+                        Funding.Instance.AddFunds(taxes, TransactionReasons.Vessels);
+                        
                     }
+                    TimeUntilTaxes = 21600;
+                    
                 }
 
 
@@ -891,14 +905,16 @@ namespace CivilianManagment
         public string educationResourceName;
         [KSPField(isPersistant = false, guiActive = false)]
         public float educationCost;
-
+        [KSPField(isPersistant = false, guiActive = false)]
+        public int xplevel;
 
 
         [KSPField(isPersistant = false, guiActive = false)]
         public string inspirationResourceName;
         [KSPField(isPersistant = false, guiActive = false)]
         public float inspirationCost;
-
+        [KSPField(isPersistant = false, guiActive = false)]
+        public string career;
 
         public static void screenMessage(string msg)
         {
@@ -950,26 +966,51 @@ namespace CivilianManagment
             var newMember = roster.GetNewKerbal(ProtoCrewMember.KerbalType.Crew);
 
             //need to make an experience trait specifically!
-            switch (job)
+            
+            
+            while (newMember.experienceTrait.Title != career)
             {
-                case KerbalJob.Pilot:
-                    KerbalRoster.SetExperienceTrait(newMember, "Pilot");
-                    break;
-                case KerbalJob.Engineer:
-                    KerbalRoster.SetExperienceTrait(newMember, "Engineer");
-                    break;
-                case KerbalJob.Scientist:
-                    KerbalRoster.SetExperienceTrait(newMember, "Scientist");
-                    break;
+                HighLogic.CurrentGame.CrewRoster.Remove(newMember);
+                newMember = HighLogic.CurrentGame.CrewRoster.GetNewKerbal(ProtoCrewMember.KerbalType.Crew);
+                
             }
+                     
+
 
             float startXP = KerbalRoster.GetExperienceLevelRequirement(startLevel);
 
-            newMember.experience = startXP + 1;
-            newMember.experienceLevel = KerbalRoster.CalculateExperienceLevel(newMember.experience);
+            if (xplevel == 3)
+            {
+                newMember.flightLog.AddEntry("Orbit,Kerbin");
+                newMember.flightLog.AddEntry("Suborbit,Kerbin");
+                newMember.flightLog.AddEntry("Flight,Kerbin");
+                newMember.flightLog.AddEntry("Land,Kerbin");
+                newMember.flightLog.AddEntry("Recover");
+                newMember.flightLog.AddEntry("Flyby,Mun");
+                newMember.flightLog.AddEntry("Orbit,Mun");
+                newMember.flightLog.AddEntry("Land,Mun");
+                newMember.flightLog.AddEntry("Flyby,Minmus");
+                newMember.flightLog.AddEntry("Orbit,Minmus");
+                newMember.flightLog.AddEntry("Land,Minmus");
+                newMember.flightLog.AddEntry("Flyby,Sun");
+                newMember.ArchiveFlightLog();
+                newMember.experience = 8;
+                newMember.experienceLevel = 3;
+            }
+            else
+            {
+                newMember.flightLog.AddEntry("Orbit,Kerbin");
+                newMember.flightLog.AddEntry("Suborbit,Kerbin");
+                newMember.flightLog.AddEntry("Flight,Kerbin");
+                newMember.flightLog.AddEntry("Land,Kerbin");
+                newMember.flightLog.AddEntry("Recover");
+                newMember.ArchiveFlightLog();
+                newMember.experience = 3;
+                newMember.experienceLevel = 1;
+            }
+            
             return newMember;
-
-
+            
         }
 
 
@@ -1015,7 +1056,7 @@ namespace CivilianManagment
         [KSPEvent(guiName = "Recruit Pilot", active = true, guiActive = true)]
         public void RecruitPilotKerbal()
         {
-
+            career = "Pilot";
             float budget = getResourceBudget(populationName);
             if (budget < civilianPopulationCost)
             {
@@ -1023,7 +1064,7 @@ namespace CivilianManagment
                 return;
             }
 
-            int xplevel = 1;
+            xplevel = 1;
             //if this is a flight school recruitment requires 5000 flight experience
             double flightXP = getResourceBudget(flightExperienceResourceName);
             double tempFlightXPCost = applyTheaterBonus(flightExperienceCost, KerbalJob.Pilot);
@@ -1068,13 +1109,13 @@ namespace CivilianManagment
 
             }
 
-
+            
 
         }
         [KSPEvent(guiName = "Recruit Engineer", active = true, guiActive = true)]
         public void RecruitEngineerKerbal()
         {
-
+            career = "Engineer";
             float budget = getResourceBudget(populationName);
             if (budget < civilianPopulationCost)
             {
@@ -1082,7 +1123,7 @@ namespace CivilianManagment
                 return;
             }
 
-            int xplevel = 1;
+            xplevel = 1;
             double education = getResourceBudget(educationResourceName);
             double tempEducationCost = applyTheaterBonus(educationCost, KerbalJob.Engineer);
             Debug.Log("engie cost: " + tempEducationCost.ToString());
@@ -1130,7 +1171,7 @@ namespace CivilianManagment
         [KSPEvent(guiName = "Recruit Scientist", active = true, guiActive = true)]
         public void RecruitScienceKerbal()
         {
-
+            career = "Scientist";
             float budget = getResourceBudget(populationName);
             if (budget < civilianPopulationCost)
             {
@@ -1138,7 +1179,7 @@ namespace CivilianManagment
                 return;
             }
 
-            int xplevel = 1;
+            xplevel = 1;
 
             double education = getResourceBudget(educationResourceName);
             double tempEducationCost = applyTheaterBonus(educationCost, KerbalJob.Scientist);

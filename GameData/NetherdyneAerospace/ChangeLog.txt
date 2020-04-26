@@ -1,0 +1,3 @@
+-- Fixed animation on small reactor. 
+--small bug with craft in kerbin SOI without Civilian Docking Ports
+--added tweakscale config
